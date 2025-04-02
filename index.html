@@ -25,6 +25,7 @@
             --border-color: #D2B48C; /* Tan */
             --quote-bg: #FFFACD; /* Lemon Chiffon */
             --nav-bg: #A0522D; /* Sienna */
+            --mobile-breakpoint: 768px; /* Define mobile breakpoint */
         }
 
         html {
@@ -53,7 +54,7 @@
             padding: 2rem 0 1.5rem 0;
             text-align: center;
             border-bottom: 5px solid var(--accent-color);
-            margin-bottom: 2rem;
+            margin-bottom: 2rem; /* Creates space above nav initially */
         }
 
         .site-header h1 {
@@ -74,18 +75,20 @@
         .main-nav {
             background-color: var(--nav-bg);
             padding: 0.75rem 0;
-            position: sticky;
-            top: 0;
+            position: sticky; /* Default sticky for desktop */
+            top: 0; /* Initial position */
             z-index: 1000;
+            width: 100%; /* Ensure it spans width */
             box-shadow: 0 2px 5px rgba(0,0,0,0.2);
             border-bottom: 2px solid var(--header-bg);
+            transition: top 0.3s ease-in-out; /* Smooth transition for hiding/showing on mobile */
         }
 
         .main-nav ul {
             list-style: none;
             display: flex;
             justify-content: center;
-            flex-wrap: wrap; /* Allow wrapping on smaller screens */
+            flex-wrap: wrap; /* Allow wrapping */
         }
 
         .main-nav li {
@@ -99,6 +102,7 @@
             padding: 0.5rem 0.75rem;
             border-radius: 4px;
             transition: background-color 0.3s ease, color 0.3s ease;
+            display: inline-block; /* Ensure padding works correctly */
         }
 
         .main-nav a:hover,
@@ -109,14 +113,18 @@
 
         /* --- Main Content Area --- */
         main {
-            padding: 2rem 0;
+            padding: 2rem 0; /* Padding adjusted slightly if needed */
         }
 
         article section {
             margin-bottom: 3rem;
-            padding-bottom: 2rem;
+            padding: 2rem 0; /* Add padding top to sections for scroll target offset */
             border-bottom: 1px solid var(--border-color);
         }
+         article section:first-of-type {
+             padding-top: 1rem; /* Less padding needed for the first section */
+         }
+
 
         article section:last-child {
             border-bottom: none;
@@ -230,7 +238,7 @@
         }
 
         /* --- Responsiveness --- */
-        @media (max-width: 768px) {
+        @media (max-width: 768px) { /* Using variable doesn't work here */
             body {
                 font-size: 16px;
             }
@@ -246,20 +254,32 @@
             h3 {
                 font-size: 1.4rem;
             }
+
             .main-nav ul {
                 justify-content: space-around; /* Better spacing on mobile */
             }
             .main-nav li {
-                margin: 0 0.5rem; /* Reduce margin */
+                margin: 0 0.5rem; /* Reduce horizontal margin */
             }
+             .main-nav li:first-child { margin-left: 0.5rem;} /* Ensure padding from edge */
+             .main-nav li:last-child { margin-right: 0.5rem;}
+
             .main-nav a {
                 font-size: 0.9rem;
                 padding: 0.4rem 0.6rem;
+                 margin: 0.2rem 0; /* Add slight vertical margin for wrapping */
             }
             blockquote {
                 margin-left: 1rem;
                 padding: 0.8rem 1rem;
             }
+             /* Sections padding adjustment for mobile nav potentially covering titles */
+             article section {
+                 padding-top: 3rem; /* Increase top padding to ensure title visibility when nav appears */
+             }
+              article section:first-of-type {
+                 padding-top: 1.5rem;
+             }
         }
 
         @media (max-width: 480px) {
@@ -267,11 +287,15 @@
                 font-size: 1.8rem;
             }
             .main-nav ul {
-                flex-direction: column; /* Stack nav items */
-                align-items: center;
+                 /* Keep flex-wrap for small screens, don't stack vertically */
+                 padding: 0 0.5rem; /* Add padding to prevent items hitting edge */
             }
             .main-nav li {
-                 margin: 0.5rem 0; /* Add vertical margin */
+                 margin: 0 0.3rem; /* Further reduce margin */
+            }
+             .main-nav a {
+                font-size: 0.85rem;
+                padding: 0.3rem 0.5rem;
             }
             .container {
                 padding: 0 15px;
@@ -289,6 +313,7 @@
         </div>
     </header>
 
+    <!-- Navigation: Remains structurally the same -->
     <nav class="main-nav" id="mainNav">
         <div class="container">
             <ul>
@@ -539,86 +564,164 @@
         <div class="container">
             <p>This website explores Madhyamaka philosophy, deeply informed by the scholarship found in the <a href="https://plato.stanford.edu/" target="_blank" rel="noopener noreferrer">Stanford Encyclopedia of Philosophy</a> and the <a href="https://iep.utm.edu/" target="_blank" rel="noopener noreferrer">Internet Encyclopedia of Philosophy</a>.</p>
             <p>Content synthesized and presented for educational purposes. Always consult primary texts and expert scholarship for in-depth study.</p>
-            <p>&copy; <span id="copyright-year"></span> Madhyamaka Study Resource. All rights reserved.</p>
+            <p>© <span id="copyright-year"></span> Madhyamaka Study Resource. All rights reserved.</p>
         </div>
     </footer>
 
     <script>
-        // --- Simple Smooth Scroll & Active Nav Link ---
-
         document.addEventListener('DOMContentLoaded', () => {
-            // Set current year in footer
+            // --- General Setup ---
             document.getElementById('copyright-year').textContent = new Date().getFullYear();
-
-            const navLinks = document.querySelectorAll('.main-nav a');
+            const nav = document.getElementById('mainNav');
+            const navLinks = nav.querySelectorAll('a');
             const sections = document.querySelectorAll('main section');
-            const mainNav = document.getElementById('mainNav'); // Get the nav bar itself
-            const navHeight = mainNav.offsetHeight; // Get the height of the sticky nav
+            const mobileBreakpoint = 768; // Match CSS breakpoint
 
-            // Smooth scrolling for nav links
+            let navHeight = nav.offsetHeight;
+            let lastScrollTop = 0;
+            const scrollThreshold = 5; // Pixels scrolled before triggering hide/show
+
+            // Recalculate navHeight on resize
+             window.addEventListener('resize', () => {
+                navHeight = nav.offsetHeight;
+             });
+
+
+            // --- Mobile Nav Hide/Show on Scroll ---
+            function handleScroll() {
+                let currentScrollTop = window.pageYOffset || document.documentElement.scrollTop;
+
+                if (window.innerWidth <= mobileBreakpoint) {
+                    // Mobile Behavior: Hide on scroll down, show on scroll up
+                    if (Math.abs(lastScrollTop - currentScrollTop) <= scrollThreshold) {
+                        return; // Avoid jittering for small scrolls
+                    }
+
+                    if (currentScrollTop > lastScrollTop && currentScrollTop > navHeight * 2) {
+                        // Scroll Down past nav height * 2 (to avoid hiding immediately)
+                        nav.style.top = `-${navHeight}px`;
+                    } else {
+                        // Scroll Up or near the top
+                       nav.style.top = '0px';
+                    }
+                } else {
+                    // Desktop Behavior: Ensure nav is always visible (sticky)
+                    nav.style.top = '0px';
+                }
+
+                lastScrollTop = currentScrollTop <= 0 ? 0 : currentScrollTop; // For Mobile or negative scrolling
+            }
+
+            window.addEventListener('scroll', handleScroll, { passive: true }); // Use passive listener for performance
+
+
+            // --- Smooth Scrolling ---
             navLinks.forEach(link => {
                 link.addEventListener('click', (e) => {
-                    // Check if the link is internal
                     if (link.hash !== "") {
-                        e.preventDefault(); // Prevent default anchor click behavior
-
+                        e.preventDefault();
                         const targetId = link.hash;
                         const targetElement = document.querySelector(targetId);
 
                         if (targetElement) {
-                            const elementPosition = targetElement.getBoundingClientRect().top;
-                            const offsetPosition = elementPosition + window.pageYOffset - navHeight - 20; // Adjust for sticky nav height and add a little buffer
+                            // Calculate offset considering the nav might be shown/hidden on mobile
+                             let currentNavHeight = nav.offsetHeight; // Get current height
+                             let headerOffset = (window.innerWidth <= mobileBreakpoint) ? currentNavHeight + 15 : currentNavHeight + 25; // Extra buffer space
 
-                             window.scrollTo({
+                            const elementPosition = targetElement.getBoundingClientRect().top;
+                            const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
+
+                            window.scrollTo({
                                 top: offsetPosition,
                                 behavior: "smooth"
                             });
 
-                            // Optional: Close mobile menu if implemented
+                            // Ensure nav is visible immediately after click on mobile
+                             if (window.innerWidth <= mobileBreakpoint) {
+                                 nav.style.top = '0px';
+                             }
                         }
                     }
                 });
             });
 
-            // Active link highlighting on scroll (Scroll Spy)
-            const observerOptions = {
-                root: null, // relative to document viewport
-                rootMargin: `-${navHeight + 50}px 0px -60% 0px`, // Adjust top margin for nav height, bottom margin to trigger earlier
-                threshold: 0 // Trigger as soon as element enters/leaves margin
-            };
 
-            const observerCallback = (entries, observer) => {
+            // --- Active Link Highlighting (Scroll Spy) ---
+            // Adjust rootMargin based on screen size
+            function getObserverOptions() {
+                 let currentNavHeight = nav.offsetHeight;
+                 // On mobile, trigger slightly lower as nav might be hidden. On desktop, account for sticky nav.
+                 let topMargin = (window.innerWidth <= mobileBreakpoint) ? -40 : -(currentNavHeight + 50);
+                 // Adjust bottom margin to trigger earlier/later if needed
+                 let bottomMargin = (window.innerWidth <= mobileBreakpoint) ? "-55%" : "-60%";
+
+                 return {
+                    root: null,
+                    rootMargin: `${topMargin}px 0px ${bottomMargin}px 0px`,
+                    threshold: 0
+                };
+            }
+
+            let observer = new IntersectionObserver(handleIntersection, getObserverOptions());
+
+            function handleIntersection(entries, observer) {
                 entries.forEach(entry => {
                     const id = entry.target.getAttribute('id');
                     const navLink = document.querySelector(`.main-nav a[href="#${id}"]`);
 
-                    if (entry.isIntersecting) {
-                        // Remove active class from all links first
-                        navLinks.forEach(link => link.classList.remove('active'));
-                        // Add active class to the current link
+                    if (entry.isIntersecting && entry.intersectionRatio > 0) {
+                         navLinks.forEach(link => link.classList.remove('active'));
                         if (navLink) {
                             navLink.classList.add('active');
                         }
                     }
-                     // Optional: handle case where multiple sections might be in view - maybe prioritize the topmost visible one
                 });
-            };
-
-            const observer = new IntersectionObserver(observerCallback, observerOptions);
-
-            sections.forEach(section => {
-                observer.observe(section);
-            });
-
-             // Special case for initial load - highlight the first link if at top
-             if (window.pageYOffset < sections[0].offsetTop - navHeight - 50) {
-                 navLinks.forEach(link => link.classList.remove('active'));
-                 const firstLink = document.querySelector('.main-nav a[href="#introduction"]');
-                 if (firstLink) firstLink.classList.add('active');
              }
 
-        });
+            // Initial setup and re-setup on resize
+            function setupObserver() {
+                observer.disconnect(); // Disconnect previous observer
+                observer = new IntersectionObserver(handleIntersection, getObserverOptions());
+                sections.forEach(section => {
+                    observer.observe(section);
+                });
+                 // Initial active state check
+                 checkInitialActiveState();
+            }
 
+            function checkInitialActiveState() {
+                 let initialActiveSet = false;
+                 let currentNavHeight = nav.offsetHeight;
+                  for (let section of sections) {
+                      const rect = section.getBoundingClientRect();
+                       // Check if section top is near or above the effective nav top edge
+                       if (rect.top <= currentNavHeight + 50) { // Add buffer
+                          const id = section.getAttribute('id');
+                          const navLink = document.querySelector(`.main-nav a[href="#${id}"]`);
+                          if (navLink) {
+                             navLinks.forEach(link => link.classList.remove('active'));
+                             navLink.classList.add('active');
+                             initialActiveSet = true;
+                             // Don't break; let the last qualifying section win if multiple are visible
+                          }
+                       }
+                  }
+                   // If no section is active (e.g., at very top), activate the first link
+                 if (!initialActiveSet && window.pageYOffset < sections[0].offsetTop / 2) {
+                     navLinks.forEach(link => link.classList.remove('active'));
+                     const firstLink = document.querySelector('.main-nav a[href="#introduction"]');
+                      if (firstLink) firstLink.classList.add('active');
+                 }
+            }
+
+
+            setupObserver(); // Initial setup
+            window.addEventListener('resize', setupObserver); // Re-setup on resize
+             // Also check active state after slight delay on load in case of slow rendering
+             setTimeout(checkInitialActiveState, 200);
+
+
+        }); // End DOMContentLoaded
     </script>
 
 </body>
